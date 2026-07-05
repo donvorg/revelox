@@ -1,3 +1,5 @@
+import importlib.metadata
+
 import click
 
 from revelox.cli.init_cmd import init_command
@@ -5,7 +7,7 @@ from revelox.cli.run_cmd import run_command
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version=importlib.metadata.version("revelox"))
 def cli() -> None:
     """Revelox — adversarial security testing for voice AI agents."""
 

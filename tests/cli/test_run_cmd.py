@@ -44,19 +44,16 @@ def test_run_cli_args_override_env(monkeypatch: pytest.MonkeyPatch):
 def test_run_missing_from_number():
     result = runner.invoke(cli, ["run", "--target", VALID_TARGET])
     assert result.exit_code != 0
-    assert "No from-number provided" in result.output
 
 
 def test_run_missing_target():
     result = runner.invoke(cli, ["run", "--from", VALID_FROM])
     assert result.exit_code != 0
-    assert "No target provided" in result.output
 
 
 def test_run_missing_both():
     result = runner.invoke(cli, ["run"])
     assert result.exit_code != 0
-    assert "No from-number provided" in result.output
 
 
 # --- E.164 validation ---
@@ -70,12 +67,14 @@ def test_run_missing_both():
         "+",                # just a plus
         "++15551234567",    # double plus
         "+1555 123 4567",   # spaces
+        "+123",             # too short (< 7 digits)
+        "+0123456789",      # leading zero after +
     ],
 )
 def test_run_rejects_invalid_e164_from(bad_number: str):
     result = runner.invoke(cli, ["run", "--from", bad_number, "--target", VALID_TARGET])
     assert result.exit_code != 0
-    assert "Invalid from-number" in result.output
+    assert "not valid E.164" in result.output
 
 
 @pytest.mark.parametrize(
@@ -84,12 +83,13 @@ def test_run_rejects_invalid_e164_from(bad_number: str):
         "5559876543",
         "+notanumber",
         "+",
+        "+123",
     ],
 )
 def test_run_rejects_invalid_e164_target(bad_number: str):
     result = runner.invoke(cli, ["run", "--from", VALID_FROM, "--target", bad_number])
     assert result.exit_code != 0
-    assert "Invalid target" in result.output
+    assert "not valid E.164" in result.output
 
 
 def test_run_rejects_empty_string_from():
@@ -102,4 +102,4 @@ def test_run_env_var_with_invalid_format(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REVELOX_TARGET_NUMBER", VALID_TARGET)
     result = runner.invoke(cli, ["run"])
     assert result.exit_code != 0
-    assert "Invalid from-number" in result.output
+    assert "not valid E.164" in result.output

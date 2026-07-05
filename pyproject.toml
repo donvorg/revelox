@@ -12,11 +12,6 @@ dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",
     "pydantic>=2.0",
-    "deepgram-sdk>=3.0",
-    "twilio>=9.0",
-    "openai>=1.0",
-    "anthropic>=0.30",
-    "websockets>=12.0",
     "pydub>=0.25",
     "structlog>=24.0",
     "rich>=13.0",
@@ -24,7 +19,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+twilio = ["twilio>=9.0"]
+deepgram = ["deepgram-sdk>=3.0"]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.30"]
+websockets = ["websockets>=12.0"]
+all = [
+    "revelox[twilio,deepgram,openai,anthropic,websockets]",
+]
 dev = [
+    "revelox[all]",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
@@ -39,7 +43,10 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH"]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH", "ANN", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.mypy]
 strict = true

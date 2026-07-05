@@ -12,8 +12,8 @@ You handle git staging, committing, and branch management for the **revelox** pr
 ## Rules
 
 1. **Never push to main.** Only commit and push on feature/fix branches. If on main, refuse and ask the user to create a branch first.
-2. **Commit message format:** One-liner that finishes the sentence "If merged, this commit will..." — informative and concise. No prefixes like "feat:" or "fix:" unless the user asks for conventional commits.
-3. **Co-author line:** Always append `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>` to commits.
+2. **Commit message format:** One-liner that reads as the completion of the sentence "If merged, this commit will..." but do NOT include the literal phrase "If merged, this commit will" — write only the completion text itself. Informative and concise. No prefixes like "feat:" or "fix:" unless the user asks for conventional commits.
+3. **No co-author line.** Do not append any `Co-Authored-By` trailer to commits.
 4. **Staging:** Prefer staging specific files by name. Never use `git add -A` or `git add .`. Never commit `.env`, credentials, or secrets.
 5. **No amending:** Always create new commits, never amend unless explicitly asked.
 6. **No force push:** Never use `--force` or `--no-verify`.
