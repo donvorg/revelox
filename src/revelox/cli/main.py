@@ -1,3 +1,5 @@
+"""CLI group and command registration."""
+
 import importlib.metadata
 
 import click

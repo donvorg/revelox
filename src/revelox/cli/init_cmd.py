@@ -1,3 +1,5 @@
+"""The ``revelox init`` command."""
+
 import click
 
 

@@ -1,3 +1,5 @@
+"""The ``revelox run`` command."""
+
 import logging
 
 import click
@@ -36,7 +38,7 @@ def run_command(from_number: str, target: str, yes: bool) -> None:
     elif not click.confirm(
         "This will place real phone calls. Do you authorize this run?"
     ):
-        raise SystemExit("Run aborted by user.")
+        raise click.Abort()
 
     click.echo(f"From:   {from_number}")
     click.echo(f"Target: {target}")
