@@ -1,5 +1,7 @@
 """Tests for the `revelox run` command."""
 
+from pathlib import Path
+
 import pytest
 from click.testing import CliRunner
 
@@ -9,6 +11,13 @@ runner = CliRunner()
 
 VALID_FROM = "+15551234567"
 VALID_TARGET = "+15559876543"
+
+MINIMAL_CONFIG = f"""\
+version: "1"
+run:
+  target: "{VALID_TARGET}"
+  from_number: "{VALID_FROM}"
+"""
 
 
 # --- Happy path ---
@@ -40,6 +49,59 @@ def test_run_cli_args_override_env(monkeypatch: pytest.MonkeyPatch):
     assert result.exit_code == 0
     assert VALID_FROM in result.output
     assert VALID_TARGET in result.output
+
+
+def test_run_shows_llm_info():
+    result = runner.invoke(
+        cli, ["run", "--from", VALID_FROM, "--target", VALID_TARGET, "--yes"]
+    )
+    assert result.exit_code == 0
+    assert "openai/gpt-4o" in result.output
+
+
+# --- Config file ---
+
+
+def test_run_loads_config_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "revelox.config.yaml").write_text(MINIMAL_CONFIG)
+    result = runner.invoke(cli, ["run", "--yes"])
+    assert result.exit_code == 0
+    assert VALID_TARGET in result.output
+    assert VALID_FROM in result.output
+
+
+def test_run_cli_overrides_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "revelox.config.yaml").write_text(MINIMAL_CONFIG)
+    override = "+19998887777"
+    result = runner.invoke(cli, ["run", "--target", override, "--yes"])
+    assert result.exit_code == 0
+    assert override in result.output
+
+
+def test_run_explicit_config_path(tmp_path):
+    config_file = tmp_path / "custom.yaml"
+    config_file.write_text(MINIMAL_CONFIG)
+    result = runner.invoke(
+        cli, ["run", "--config", str(config_file), "--yes"]
+    )
+    assert result.exit_code == 0
+    assert VALID_TARGET in result.output
+
+
+def test_run_bad_config_file(tmp_path):
+    config_file = tmp_path / "bad.yaml"
+    config_file.write_text("not: valid: yaml: [")
+    result = runner.invoke(cli, ["run", "--config", str(config_file), "--yes"])
+    assert result.exit_code != 0
+
+
+def test_run_works_without_config():
+    result = runner.invoke(
+        cli, ["run", "--from", VALID_FROM, "--target", VALID_TARGET, "--yes"]
+    )
+    assert result.exit_code == 0
 
 
 # --- Authorization gate ---
