@@ -12,13 +12,9 @@ def test_init_creates_config_file(tmp_path, monkeypatch):
     result = runner.invoke(cli, ["init"])
     assert result.exit_code == 0
     assert "Created" in result.output
-    assert (tmp_path / "revelox.config.yaml").exists()
-
-
-def test_init_file_has_content(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    runner.invoke(cli, ["init"])
-    content = (tmp_path / "revelox.config.yaml").read_text()
+    config = tmp_path / "revelox.config.yaml"
+    assert config.exists()
+    content = config.read_text()
     assert "target:" in content
     assert "from_number:" in content
     assert "llm:" in content

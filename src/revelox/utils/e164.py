@@ -26,10 +26,8 @@ class E164Type(click.ParamType):
         """Convert and validate a CLI argument as an E.164 phone number."""
         try:
             return validate_e164(value)
-        except ValueError:
-            self.fail(
-                f"'{value}' is not valid E.164 (e.g. +15551234567)", param, ctx
-            )
+        except ValueError as e:
+            self.fail(str(e), param, ctx)
 
 
 E164 = E164Type()
