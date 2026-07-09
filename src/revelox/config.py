@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, field_validator
 
-from revelox.utils.e164 import E164_PATTERN
+from revelox.utils.e164 import validate_e164
+
+CONFIG_FILENAME = "revelox.config.yaml"
 
 DEFAULT_CONFIG_YAML = """\
 # revelox configuration
@@ -61,12 +65,9 @@ class RunConfig(BaseModel):
 
     @field_validator("target", "from_number")
     @classmethod
-    def validate_e164(cls, v: str) -> str:
+    def check_e164(cls, v: str) -> str:
         """Validate phone numbers are E.164 format."""
-        if not E164_PATTERN.fullmatch(v):
-            msg = f"'{v}' is not valid E.164 (e.g. +15551234567)"
-            raise ValueError(msg)
-        return v
+        return validate_e164(v)
 
 
 class ReveloxConfig(BaseModel):
@@ -80,8 +81,8 @@ class ConfigError(Exception):
     """Raised when config loading or validation fails."""
 
 
-def load_config(path: Path) -> ReveloxConfig:
-    """Load and validate a revelox config file."""
+def load_config(path: Path) -> dict[str, Any]:
+    """Load and parse a revelox config file, returning the raw data dict."""
     try:
         raw = path.read_text()
     except FileNotFoundError:
@@ -97,7 +98,4 @@ def load_config(path: Path) -> ReveloxConfig:
     if not isinstance(data, dict):
         raise ConfigError(f"Config file must be a YAML mapping, got {type(data).__name__}")
 
-    try:
-        return ReveloxConfig.model_validate(data)
-    except Exception as e:
-        raise ConfigError(f"Config validation failed: {e}") from None
+    return data

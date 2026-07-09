@@ -91,7 +91,7 @@ def test_missing_from_number_raises():
 # --- Loader ---
 
 
-def test_load_valid_config(tmp_path):
+def test_load_returns_raw_dict(tmp_path):
     config_file = tmp_path / "revelox.config.yaml"
     config_file.write_text(f"""\
 version: "1"
@@ -102,13 +102,13 @@ run:
     provider: openai
     model: gpt-4o
 """)
-    cfg = load_config(config_file)
-    assert cfg.run.target == VALID_TARGET
-    assert cfg.run.from_number == VALID_FROM
-    assert cfg.run.llm.model == "gpt-4o"
+    data = load_config(config_file)
+    assert isinstance(data, dict)
+    assert data["version"] == "1"
+    assert data["run"]["target"] == VALID_TARGET
 
 
-def test_load_minimal_config(tmp_path):
+def test_load_valid_config_validates_through_model(tmp_path):
     config_file = tmp_path / "revelox.config.yaml"
     config_file.write_text(f"""\
 version: "1"
@@ -116,7 +116,9 @@ run:
   target: "{VALID_TARGET}"
   from_number: "{VALID_FROM}"
 """)
-    cfg = load_config(config_file)
+    data = load_config(config_file)
+    cfg = ReveloxConfig.model_validate(data)
+    assert cfg.run.target == VALID_TARGET
     assert cfg.run.llm.provider == "openai"
     assert cfg.run.modules == ["all"]
 
@@ -140,13 +142,13 @@ def test_load_non_mapping_yaml(tmp_path):
         load_config(config_file)
 
 
-def test_load_invalid_phone_in_yaml(tmp_path):
-    config_file = tmp_path / "bad_phone.yaml"
-    config_file.write_text("""\
+def test_load_partial_config_does_not_fail(tmp_path):
+    config_file = tmp_path / "partial.yaml"
+    config_file.write_text(f"""\
 version: "1"
 run:
-  target: "not-a-number"
-  from_number: "+15551234567"
+  target: "{VALID_TARGET}"
 """)
-    with pytest.raises(ConfigError, match="validation failed"):
-        load_config(config_file)
+    data = load_config(config_file)
+    assert data["run"]["target"] == VALID_TARGET
+    assert "from_number" not in data["run"]

@@ -4,13 +4,14 @@ import logging
 from pathlib import Path
 
 import click
+from pydantic import ValidationError
 
-from revelox.config import ConfigError, RunConfig, load_config
+from revelox.config import CONFIG_FILENAME, ConfigError, RunConfig, load_config
 from revelox.utils.e164 import E164
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path("revelox.config.yaml")
+DEFAULT_CONFIG_PATH = Path(CONFIG_FILENAME)
 
 
 @click.command()
@@ -72,32 +73,36 @@ def _resolve_config(
 ) -> RunConfig:
     """Build RunConfig from config file + CLI overrides."""
     config_file = config_path or DEFAULT_CONFIG_PATH
-    base: dict[str, object] = {}
 
+    if config_path is not None and not config_file.exists():
+        raise click.ClickException(f"Config file not found: {config_file}")
+
+    base: dict[str, object] = {}
     if config_file.exists():
         try:
-            cfg = load_config(config_file)
+            data = load_config(config_file)
         except ConfigError as e:
             raise click.ClickException(str(e)) from None
-        base = cfg.run.model_dump()
+        run_section = data.get("run")
+        if isinstance(run_section, dict):
+            base = run_section
 
     if from_number is not None:
         base["from_number"] = from_number
     if target is not None:
         base["target"] = target
-    if yes:
-        base["yes"] = True
+    base["yes"] = yes
 
-    if "from_number" not in base or not base.get("from_number"):
+    if not base.get("from_number"):
         raise click.UsageError(
             "No from-number provided. Pass --from, set TWILIO_PHONE_NUMBER, or add to config."
         )
-    if "target" not in base or not base.get("target"):
+    if not base.get("target"):
         raise click.UsageError(
             "No target provided. Pass --target, set REVELOX_TARGET_NUMBER, or add to config."
         )
 
     try:
         return RunConfig.model_validate(base)
-    except Exception as e:
+    except ValidationError as e:
         raise click.ClickException(f"Invalid configuration: {e}") from None

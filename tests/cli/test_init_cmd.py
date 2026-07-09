@@ -1,7 +1,5 @@
 """Tests for the `revelox init` command."""
 
-from pathlib import Path
-
 from click.testing import CliRunner
 
 from revelox.cli.main import cli

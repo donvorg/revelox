@@ -1,7 +1,5 @@
 """Tests for the `revelox run` command."""
 
-from pathlib import Path
-
 import pytest
 from click.testing import CliRunner
 
@@ -90,6 +88,14 @@ def test_run_explicit_config_path(tmp_path):
     assert VALID_TARGET in result.output
 
 
+def test_run_explicit_config_missing_errors(tmp_path):
+    result = runner.invoke(
+        cli, ["run", "--config", str(tmp_path / "nonexistent.yaml"), "--yes"]
+    )
+    assert result.exit_code != 0
+    assert "not found" in result.output
+
+
 def test_run_bad_config_file(tmp_path):
     config_file = tmp_path / "bad.yaml"
     config_file.write_text("not: valid: yaml: [")
@@ -102,6 +108,21 @@ def test_run_works_without_config():
         cli, ["run", "--from", VALID_FROM, "--target", VALID_TARGET, "--yes"]
     )
     assert result.exit_code == 0
+
+
+def test_run_partial_config_with_cli_override(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "revelox.config.yaml").write_text(f"""\
+version: "1"
+run:
+  target: "{VALID_TARGET}"
+""")
+    result = runner.invoke(
+        cli, ["run", "--from", VALID_FROM, "--yes"]
+    )
+    assert result.exit_code == 0
+    assert VALID_TARGET in result.output
+    assert VALID_FROM in result.output
 
 
 # --- Authorization gate ---
@@ -133,6 +154,20 @@ def test_run_yes_flag_skips_prompt():
     )
     assert result.exit_code == 0
     assert "authorize" not in result.output.lower()
+
+
+def test_run_config_yes_does_not_bypass_prompt(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "revelox.config.yaml").write_text(f"""\
+version: "1"
+run:
+  target: "{VALID_TARGET}"
+  from_number: "{VALID_FROM}"
+  yes: true
+""")
+    result = runner.invoke(cli, ["run"], input="y\n")
+    assert result.exit_code == 0
+    assert "authorize" in result.output.lower()
 
 
 # --- Missing required values ---

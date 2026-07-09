@@ -4,9 +4,7 @@ from pathlib import Path
 
 import click
 
-from revelox.config import DEFAULT_CONFIG_YAML
-
-CONFIG_FILENAME = "revelox.config.yaml"
+from revelox.config import CONFIG_FILENAME, DEFAULT_CONFIG_YAML
 
 
 @click.command()
