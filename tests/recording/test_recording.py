@@ -17,6 +17,17 @@ MULAW_SAMPLE_RATE = 8000
 DEEPGRAM_CLIENT = "deepgram.DeepgramClient"
 
 
+def _mock_stt_response(transcript: str) -> MagicMock:
+    """Build a mock Deepgram STT response with a single transcript."""
+    alt = MagicMock()
+    alt.transcript = transcript
+    channel = MagicMock()
+    channel.alternatives = [alt]
+    response = MagicMock()
+    response.results.channels = [channel]
+    return response
+
+
 class TestTranscribeAudio:
     """Tests for the transcribe_audio function."""
 
@@ -35,15 +46,9 @@ class TestTranscribeAudio:
         self, mock_client_cls: MagicMock, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("DEEPGRAM_API_KEY", "fake-key")
-
-        alt = MagicMock()
-        alt.transcript = "Hello there"
-        channel = MagicMock()
-        channel.alternatives = [alt]
-        response = MagicMock()
-        response.results.channels = [channel]
-
-        mock_client_cls.return_value.listen.v1.media.transcribe_file.return_value = response
+        mock_client_cls.return_value.listen.v1.media.transcribe_file.return_value = (
+            _mock_stt_response("Hello there")
+        )
 
         audio = b"\x80" * MULAW_SAMPLE_RATE
         assert transcribe_audio(audio) == "Hello there"
@@ -76,16 +81,8 @@ class TestTranscribeAudio:
         self, mock_client_cls: MagicMock, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("DEEPGRAM_API_KEY", "fake-key")
-
-        alt = MagicMock()
-        alt.transcript = "test"
-        channel = MagicMock()
-        channel.alternatives = [alt]
-        response = MagicMock()
-        response.results.channels = [channel]
-
         transcribe = mock_client_cls.return_value.listen.v1.media.transcribe_file
-        transcribe.return_value = response
+        transcribe.return_value = _mock_stt_response("test")
 
         audio = b"\x80" * MULAW_SAMPLE_RATE
         transcribe_audio(audio)

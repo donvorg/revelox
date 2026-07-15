@@ -51,7 +51,7 @@ def pipeline_mocks(monkeypatch: pytest.MonkeyPatch):
     """Patch the full Twilio pipeline so run_command completes without blocking."""
     monkeypatch.setenv("PUBLIC_BASE_URL", "https://test.ngrok.io")
     with (
-        patch("revelox.tts.synthesize_script", return_value=[b"\xff" * 160]),
+        patch("revelox.tts.synthesize_turns", return_value=[b"\xff" * 160]),
         patch("revelox.server.create_app", side_effect=_mock_create_app),
         patch("uvicorn.Config"),
         patch("uvicorn.Server", new_callable=_make_server_class),

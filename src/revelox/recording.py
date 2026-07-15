@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 
 from pydub import AudioSegment
 
-logger = logging.getLogger(__name__)
+from revelox.tts import MULAW_SAMPLE_RATE
 
-MULAW_SAMPLE_RATE = 8000
+logger = logging.getLogger(__name__)
 
 
 @dataclass

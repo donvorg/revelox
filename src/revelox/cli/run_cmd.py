@@ -90,14 +90,14 @@ def run_command(
     from revelox.recording import CallResult, save_recording
     from revelox.script import parse_script
     from revelox.server import create_app
-    from revelox.tts import synthesize_script
+    from revelox.tts import synthesize_turns
 
     click.echo(f"From:   {run_config.from_number}")
     click.echo(f"Target: {run_config.target}")
 
     click.echo("Synthesizing script...")
     script_turns = parse_script(script)
-    audio_buffers = synthesize_script(script)
+    audio_buffers = synthesize_turns(script_turns)
     click.echo(f"Synthesized {len(audio_buffers)} turn(s).")
 
     call_done = threading.Event()

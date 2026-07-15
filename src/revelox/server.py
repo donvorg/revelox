@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
 
+from revelox.tts import MULAW_SILENCE_BYTE
+
 logger = logging.getLogger(__name__)
 
 FRAME_SIZE = 160
@@ -25,7 +27,7 @@ FRAME_DURATION_S = 0.02
 SILENCE_THRESHOLD_FRAMES = 40
 MIN_RESPONSE_FRAMES = 10
 RESPONSE_TIMEOUT_S = 10.0
-MULAW_SILENCE_BYTE = 0xFF
+SILENCE_FRAME = MULAW_SILENCE_BYTE * FRAME_SIZE
 
 
 def create_app(
@@ -101,7 +103,7 @@ def create_app(
                         state.consecutive_silence = 0
 
                     if (
-                        state.waiting_for_response
+                        not state.response_done.is_set()
                         and state.total_response_frames >= MIN_RESPONSE_FRAMES
                         and state.consecutive_silence >= SILENCE_THRESHOLD_FRAMES
                     ):
@@ -149,12 +151,11 @@ class _StreamState:
         self.response_buffer = bytearray()
         self.consecutive_silence = 0
         self.total_response_frames = 0
-        self.waiting_for_response = False
 
 
 def _is_silence_frame(frame: bytes) -> bool:
     """Check if a frame is all mulaw silence bytes."""
-    return all(b == MULAW_SILENCE_BYTE for b in frame)
+    return frame == SILENCE_FRAME
 
 
 async def _sender(ws: WebSocket, state: _StreamState) -> None:
@@ -193,7 +194,6 @@ async def _await_response(state: _StreamState, turn_index: int) -> None:
     state.response_buffer.clear()
     state.consecutive_silence = 0
     state.total_response_frames = 0
-    state.waiting_for_response = True
     state.response_done.clear()
 
     try:
@@ -203,8 +203,6 @@ async def _await_response(state: _StreamState, turn_index: int) -> None:
         )
     except TimeoutError:
         logger.debug("Response timeout after turn %d", turn_index)
-
-    state.waiting_for_response = False
 
     if state.call_result is not None:
         state.call_result.turn_responses.append(bytes(state.response_buffer))
