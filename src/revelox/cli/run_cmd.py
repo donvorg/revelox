@@ -64,7 +64,7 @@ def run_command(
     if not public_base_url:
         raise click.UsageError("PUBLIC_BASE_URL environment variable is required.")
 
-    import asyncio
+    import time
 
     import uvicorn
 
@@ -79,7 +79,7 @@ def run_command(
     audio_buffers = synthesize_script(script)
     click.echo(f"Synthesized {len(audio_buffers)} turn(s).")
 
-    call_done = asyncio.Event()
+    call_done = threading.Event()
     app = create_app(audio_buffers, call_done=call_done)
 
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
@@ -87,13 +87,14 @@ def run_command(
     server_thread = threading.Thread(target=server.run, daemon=True)
     server_thread.start()
 
-    import time
-
-    time.sleep(1)
+    while not server.started:
+        time.sleep(0.05)
 
     voice_url = f"{public_base_url}/voice"
     click.echo(f"Dialing {target}...")
     call_sid = dial(from_number, target, voice_url)
     click.echo(f"Call placed: {call_sid}")
 
+    call_done.wait()
+    server.should_exit = True
     server_thread.join()

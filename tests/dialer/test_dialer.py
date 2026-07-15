@@ -22,7 +22,7 @@ class TestDial:
         with pytest.raises(DialError, match="TWILIO_ACCOUNT_SID"):
             dial("+15551234567", "+15559876543", "https://example.com/voice")
 
-    @patch("revelox.dialer.Client" if False else "twilio.rest.Client")
+    @patch("twilio.rest.Client")
     def test_successful_dial(
         self, mock_client_cls: MagicMock, monkeypatch: pytest.MonkeyPatch
     ) -> None:

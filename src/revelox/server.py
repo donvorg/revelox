@@ -6,7 +6,10 @@ import asyncio
 import base64
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import threading
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
@@ -17,7 +20,7 @@ FRAME_SIZE = 160
 FRAME_DURATION_S = 0.02
 
 
-def create_app(audio_buffers: list[bytes], call_done: asyncio.Event | None = None) -> FastAPI:
+def create_app(audio_buffers: list[bytes], call_done: threading.Event | None = None) -> FastAPI:
     """Build a FastAPI app that streams pre-synthesized audio to Twilio.
 
     Args:
@@ -34,18 +37,16 @@ def create_app(audio_buffers: list[bytes], call_done: asyncio.Event | None = Non
         from twilio.twiml.voice_response import Connect, VoiceResponse
 
         host = request.headers.get("host", "localhost")
-        scheme = "wss" if request.url.scheme == "https" else "ws"
 
         resp = VoiceResponse()
         connect: Connect = resp.connect()  # type: ignore[assignment]
-        connect.stream(url=f"{scheme}://{host}/media-stream")
+        connect.stream(url=f"wss://{host}/media-stream")
         return Response(content=str(resp), media_type="application/xml")
 
     @app.websocket("/media-stream")
     async def media_stream(ws: WebSocket) -> None:
         """Handle the Twilio media stream WebSocket."""
         await ws.accept()
-        ws_lock = asyncio.Lock()
         stream_task: asyncio.Task[None] | None = None
 
         async def _stream_audio(stream_sid: str) -> None:
@@ -61,8 +62,7 @@ def create_app(audio_buffers: list[bytes], call_done: asyncio.Event | None = Non
                             "media": {"payload": payload},
                         }
                     )
-                    async with ws_lock:
-                        await ws.send_text(msg)
+                    await ws.send_text(msg)
                     await asyncio.sleep(FRAME_DURATION_S)
 
         try:
