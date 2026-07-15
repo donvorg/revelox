@@ -34,7 +34,7 @@ def test_whitespace_only_turn_produces_silence(mock_client_cls, monkeypatch):
 def test_synthesizes_each_turn(mock_client_cls, monkeypatch):
     monkeypatch.setenv("DEEPGRAM_API_KEY", "fake-key")
     mock_generate = mock_client_cls.return_value.speak.v1.audio.generate
-    mock_generate.return_value = iter([b"\x00\x01", b"\x02\x03"])
+    mock_generate.side_effect = lambda **_: iter([b"\x00\x01", b"\x02\x03"])
 
     result = synthesize_turns(["hello", "world"])
     assert len(result) == 2
@@ -63,7 +63,7 @@ def test_deepgram_called_with_correct_params(mock_client_cls, monkeypatch):
 def test_mixed_empty_and_text_turns(mock_client_cls, monkeypatch):
     monkeypatch.setenv("DEEPGRAM_API_KEY", "fake-key")
     mock_generate = mock_client_cls.return_value.speak.v1.audio.generate
-    mock_generate.return_value = iter([b"\xaa\xbb"])
+    mock_generate.side_effect = lambda **_: iter([b"\xaa\xbb"])
 
     result = synthesize_turns(["hello", "", "goodbye"])
     assert len(result) == 3

@@ -48,5 +48,5 @@ class TestDial:
         monkeypatch.setenv("TWILIO_AUTH_TOKEN", "token123")
         mock_client_cls.return_value.calls.create.side_effect = RuntimeError("boom")
 
-        with pytest.raises(DialError, match="Twilio API error.*boom"):
+        with pytest.raises(DialError, match=r"Twilio API error.*boom"):
             dial("+15551234567", "+15559876543", "https://example.com/voice")

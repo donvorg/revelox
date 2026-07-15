@@ -1,5 +1,7 @@
 """Tests for the chat history context management module."""
 
+import pytest
+
 from revelox.chat import ChatHistory, ChatMessage
 
 
@@ -47,6 +49,63 @@ class TestChatHistory:
         assert ctx[0].role == "system"
         assert "summary of 10 messages" in ctx[0].content
         assert ctx[1].content == "msg-10"
+
+    def test_repeated_summarize_includes_prior_summary(self) -> None:
+        h = ChatHistory()
+        for i in range(20):
+            h.add("user", f"msg-{i}")
+        h.summarize(lambda msgs: "first-summary", keep_recent=5)
+        for i in range(10):
+            h.add("user", f"new-{i}")
+        received: list[list[ChatMessage]] = []
+        h.summarize(lambda msgs: (received.append(msgs), "second-summary")[1], keep_recent=5)
+        assert received[0][0].content == "first-summary"
+
+    def test_summarize_keep_recent_zero(self) -> None:
+        h = ChatHistory()
+        for i in range(5):
+            h.add("user", f"msg-{i}")
+        h.summarize(lambda msgs: f"summary of {len(msgs)}", keep_recent=0)
+        assert len(h) == 0
+        ctx = h.context(recent_n=5)
+        assert len(ctx) == 1
+        assert "summary of 5" in ctx[0].content
+
+    def test_summarize_exception_preserves_state(self) -> None:
+        h = ChatHistory()
+        for i in range(10):
+            h.add("user", f"msg-{i}")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            h.summarize(lambda msgs: (_ for _ in ()).throw(RuntimeError("boom")), keep_recent=3)
+
+        assert len(h) == 10
+        assert h.context() == h.recent(10)
+
+    def test_recent_zero(self) -> None:
+        h = ChatHistory()
+        h.add("user", "a")
+        assert h.recent(0) == []
+
+    def test_recent_negative_raises(self) -> None:
+        h = ChatHistory()
+        with pytest.raises(ValueError, match="non-negative"):
+            h.recent(-1)
+
+    def test_context_recent_n_zero(self) -> None:
+        h = ChatHistory()
+        h.add("user", "a")
+        assert h.context(recent_n=0) == []
+
+    def test_context_recent_n_negative_raises(self) -> None:
+        h = ChatHistory()
+        with pytest.raises(ValueError, match="non-negative"):
+            h.context(recent_n=-1)
+
+    def test_summarize_negative_keep_recent_raises(self) -> None:
+        h = ChatHistory()
+        with pytest.raises(ValueError, match="non-negative"):
+            h.summarize(lambda msgs: "x", keep_recent=-1)
 
     def test_summarize_noop_when_few_messages(self) -> None:
         h = ChatHistory()

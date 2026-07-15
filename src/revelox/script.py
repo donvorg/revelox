@@ -56,10 +56,26 @@ def parse_script(path: Path) -> list[str]:
 
 
 def _check_mismatched_delimiters(content: str) -> None:
-    """Raise ScriptError if START_TURN and END_TURN counts don't match."""
+    """Raise ScriptError if delimiters are mismatched or misordered."""
     starts = content.count(START_TURN)
     ends = content.count(END_TURN)
     if starts != ends:
         raise ScriptError(
             f"Mismatched delimiters: {starts} {START_TURN} vs {ends} {END_TURN}"
         )
+    depth = 0
+    for token, delta in _scan_delimiters(content):
+        depth += delta
+        if depth > 1:
+            raise ScriptError(f"Nested {START_TURN} found")
+        if depth < 0:
+            raise ScriptError(f"{END_TURN} without matching {START_TURN}")
+
+
+def _scan_delimiters(content: str) -> list[tuple[str, int]]:
+    """Return delimiter tokens in order with +1 for START, -1 for END."""
+    pattern = re.compile(re.escape(START_TURN) + "|" + re.escape(END_TURN))
+    return [
+        (m.group(), 1 if m.group() == START_TURN else -1)
+        for m in pattern.finditer(content)
+    ]

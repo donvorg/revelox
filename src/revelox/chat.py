@@ -31,6 +31,10 @@ class ChatHistory:
 
     def recent(self, n: int) -> list[ChatMessage]:
         """Return the last *n* messages."""
+        if n < 0:
+            raise ValueError("n must be non-negative")
+        if n == 0:
+            return []
         return self._messages[-n:]
 
     def summarize(
@@ -44,15 +48,27 @@ class ChatHistory:
             summarizer: Callable that takes a list of messages and returns a summary string.
             keep_recent: Number of recent messages to keep verbatim.
         """
+        if keep_recent < 0:
+            raise ValueError("keep_recent must be non-negative")
         if len(self._messages) <= keep_recent:
             return
-        old = self._messages[:-keep_recent]
-        self._messages = self._messages[-keep_recent:]
-        self._summary = ChatMessage(role="system", content=summarizer(old))
+        old = self._messages[:-keep_recent] if keep_recent > 0 else list(self._messages)
+        to_summarize: list[ChatMessage] = []
+        if self._summary:
+            to_summarize.append(self._summary)
+        to_summarize.extend(old)
+        summary_text = summarizer(to_summarize)
+        self._messages = self._messages[-keep_recent:] if keep_recent > 0 else []
+        self._summary = ChatMessage(role="system", content=summary_text)
 
     def context(self, recent_n: int = 10) -> list[ChatMessage]:
         """Return the optimal context window for an LLM call."""
-        recent = self._messages[-recent_n:]
+        if recent_n < 0:
+            raise ValueError("recent_n must be non-negative")
+        if recent_n == 0:
+            recent: list[ChatMessage] = []
+        else:
+            recent = self._messages[-recent_n:]
         if self._summary:
             return [self._summary, *recent]
         return recent
