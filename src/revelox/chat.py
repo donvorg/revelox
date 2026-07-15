@@ -63,15 +63,10 @@ class ChatHistory:
 
     def context(self, recent_n: int = 10) -> list[ChatMessage]:
         """Return the optimal context window for an LLM call."""
-        if recent_n < 0:
-            raise ValueError("recent_n must be non-negative")
-        if recent_n == 0:
-            recent: list[ChatMessage] = []
-        else:
-            recent = self._messages[-recent_n:]
+        msgs = self.recent(recent_n)
         if self._summary:
-            return [self._summary, *recent]
-        return recent
+            return [self._summary, *msgs]
+        return msgs
 
     def __len__(self) -> int:
         """Return the total number of messages."""

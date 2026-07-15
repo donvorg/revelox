@@ -80,5 +80,5 @@ def test_mismatched_delimiters_extra_start(tmp_path):
 def test_mismatched_delimiters_extra_end(tmp_path):
     script = tmp_path / "mismatch.txt"
     script.write_text("<START_TURN>hello<END_TURN>\n<END_TURN>")
-    with pytest.raises(ScriptError, match="Mismatched delimiters"):
+    with pytest.raises(ScriptError, match="without matching"):
         parse_script(script)
