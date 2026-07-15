@@ -7,9 +7,8 @@ from revelox.cli.main import cli
 runner = CliRunner()
 
 
-def test_init_creates_config_file(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(cli, ["init"])
+def test_init_creates_config_file(tmp_path):
+    result = runner.invoke(cli, ["init", "--output-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert "Created" in result.output
     config = tmp_path / "revelox.config.yaml"
@@ -20,18 +19,16 @@ def test_init_creates_config_file(tmp_path, monkeypatch):
     assert "llm:" in content
 
 
-def test_init_refuses_overwrite(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_init_refuses_overwrite(tmp_path):
     (tmp_path / "revelox.config.yaml").write_text("existing")
-    result = runner.invoke(cli, ["init"])
+    result = runner.invoke(cli, ["init", "--output-dir", str(tmp_path)])
     assert result.exit_code != 0
     assert "already exists" in result.output
 
 
-def test_init_force_overwrites(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_init_force_overwrites(tmp_path):
     (tmp_path / "revelox.config.yaml").write_text("existing")
-    result = runner.invoke(cli, ["init", "--force"])
+    result = runner.invoke(cli, ["init", "--force", "--output-dir", str(tmp_path)])
     assert result.exit_code == 0
     content = (tmp_path / "revelox.config.yaml").read_text()
     assert content != "existing"
