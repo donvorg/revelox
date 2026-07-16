@@ -87,6 +87,8 @@ def run_command(
     import uvicorn
 
     from revelox.dialer import dial
+    from revelox.recording import CallResult, save_recording
+    from revelox.script import parse_script
     from revelox.server import create_app
     from revelox.tts import synthesize_script
 
@@ -94,11 +96,13 @@ def run_command(
     click.echo(f"Target: {run_config.target}")
 
     click.echo("Synthesizing script...")
+    script_turns = parse_script(script)
     audio_buffers = synthesize_script(script)
     click.echo(f"Synthesized {len(audio_buffers)} turn(s).")
 
     call_done = threading.Event()
-    app = create_app(audio_buffers, call_done=call_done)
+    call_result = CallResult()
+    app = create_app(audio_buffers, call_done=call_done, call_result=call_result)
 
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
@@ -116,6 +120,11 @@ def run_command(
     call_done.wait()
     server.should_exit = True
     server_thread.join()
+
+    output_dir = Path("output") / (call_result.call_sid or call_sid)
+    click.echo("Saving recording...")
+    save_recording(call_result, audio_buffers, script_turns, output_dir)
+    click.echo(f"Output saved to {output_dir}")
 
 
 def _resolve_config(

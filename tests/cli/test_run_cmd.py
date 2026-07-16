@@ -35,7 +35,7 @@ def _base_args(script_file: str) -> list[str]:
     return ["run", "--from", VALID_FROM, "--target", VALID_TARGET, "--script", script_file, "--yes"]
 
 
-def _mock_create_app(audio_buffers, call_done: Event):
+def _mock_create_app(audio_buffers, call_done: Event, call_result=None):
     call_done.set()
     return MagicMock()
 
@@ -56,6 +56,7 @@ def pipeline_mocks(monkeypatch: pytest.MonkeyPatch):
         patch("uvicorn.Config"),
         patch("uvicorn.Server", new_callable=_make_server_class),
         patch("revelox.dialer.dial", return_value="CA_test"),
+        patch("revelox.recording.save_recording"),
     ):
         yield
 
