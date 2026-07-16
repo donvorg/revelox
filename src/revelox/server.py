@@ -112,6 +112,9 @@ def create_app(
                 elif event == "mark":
                     mark_name = data.get("mark", {}).get("name", "")
                     logger.debug("Mark received: %s", mark_name)
+                    if mark_name == "playback-done":
+                        logger.info("Playback complete, closing stream")
+                        break
                     state.mark_received.set()
 
                 elif event == "stop":
@@ -186,6 +189,15 @@ async def _sender(ws: WebSocket, state: _StreamState) -> None:
         await ws.send_text(mark_msg)
 
         await _await_response(state, i)
+
+    done_msg = json.dumps(
+        {
+            "event": "mark",
+            "streamSid": state.stream_sid,
+            "mark": {"name": "playback-done"},
+        }
+    )
+    await ws.send_text(done_msg)
 
 
 MARK_TIMEOUT_S = 5.0
