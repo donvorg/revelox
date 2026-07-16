@@ -5,12 +5,19 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 
 import click
+import uvicorn
 from pydantic import ValidationError
 
 from revelox.config import CONFIG_FILENAME, ConfigError, RunConfig, load_config
+from revelox.dialer import dial
+from revelox.recording import CallResult, save_recording
+from revelox.script import parse_script
+from revelox.server import create_app
+from revelox.tts import synthesize_turns
 from revelox.utils.e164 import E164
 
 logger = logging.getLogger(__name__)
@@ -82,22 +89,12 @@ def run_command(
     if not public_base_url:
         raise click.UsageError("PUBLIC_BASE_URL environment variable is required.")
 
-    import time
-
-    import uvicorn
-
-    from revelox.dialer import dial
-    from revelox.recording import CallResult, save_recording
-    from revelox.script import parse_script
-    from revelox.server import create_app
-    from revelox.tts import synthesize_script
-
     click.echo(f"From:   {run_config.from_number}")
     click.echo(f"Target: {run_config.target}")
 
     click.echo("Synthesizing script...")
     script_turns = parse_script(script)
-    audio_buffers = synthesize_script(script)
+    audio_buffers = synthesize_turns(script_turns)
     click.echo(f"Synthesized {len(audio_buffers)} turn(s).")
 
     call_done = threading.Event()
@@ -117,7 +114,9 @@ def run_command(
     call_sid = dial(run_config.from_number, run_config.target, voice_url)
     click.echo(f"Call placed: {call_sid}")
 
-    call_done.wait()
+    CALL_TIMEOUT_S = 300
+    if not call_done.wait(timeout=CALL_TIMEOUT_S):
+        logger.warning("Call did not complete within %ds", CALL_TIMEOUT_S)
     server.should_exit = True
     server_thread.join()
 

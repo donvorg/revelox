@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
 
+from revelox.tts import MULAW_SILENCE_BYTE
+
 logger = logging.getLogger(__name__)
 
 FRAME_SIZE = 160
@@ -25,7 +27,7 @@ FRAME_DURATION_S = 0.02
 SILENCE_THRESHOLD_FRAMES = 40
 MIN_RESPONSE_FRAMES = 10
 RESPONSE_TIMEOUT_S = 10.0
-MULAW_SILENCE_BYTE = 0xFF
+SILENCE_FRAME = MULAW_SILENCE_BYTE * FRAME_SIZE
 
 
 def create_app(
@@ -101,7 +103,7 @@ def create_app(
                         state.consecutive_silence = 0
 
                     if (
-                        state.waiting_for_response
+                        not state.response_done.is_set()
                         and state.total_response_frames >= MIN_RESPONSE_FRAMES
                         and state.consecutive_silence >= SILENCE_THRESHOLD_FRAMES
                     ):
@@ -110,6 +112,9 @@ def create_app(
                 elif event == "mark":
                     mark_name = data.get("mark", {}).get("name", "")
                     logger.debug("Mark received: %s", mark_name)
+                    if mark_name == "playback-done":
+                        logger.info("Playback complete, closing stream")
+                        break
                     state.mark_received.set()
 
                 elif event == "stop":
@@ -149,12 +154,11 @@ class _StreamState:
         self.response_buffer = bytearray()
         self.consecutive_silence = 0
         self.total_response_frames = 0
-        self.waiting_for_response = False
 
 
 def _is_silence_frame(frame: bytes) -> bool:
     """Check if a frame is all mulaw silence bytes."""
-    return all(b == MULAW_SILENCE_BYTE for b in frame)
+    return frame == SILENCE_FRAME
 
 
 async def _sender(ws: WebSocket, state: _StreamState) -> None:
@@ -173,6 +177,8 @@ async def _sender(ws: WebSocket, state: _StreamState) -> None:
             await ws.send_text(msg)
             await asyncio.sleep(FRAME_DURATION_S)
 
+        state.mark_received.clear()
+
         mark_msg = json.dumps(
             {
                 "event": "mark",
@@ -184,16 +190,29 @@ async def _sender(ws: WebSocket, state: _StreamState) -> None:
 
         await _await_response(state, i)
 
+    done_msg = json.dumps(
+        {
+            "event": "mark",
+            "streamSid": state.stream_sid,
+            "mark": {"name": "playback-done"},
+        }
+    )
+    await ws.send_text(done_msg)
+
+
+MARK_TIMEOUT_S = 5.0
+
 
 async def _await_response(state: _StreamState, turn_index: int) -> None:
     """Wait for the mark echo, then listen for the target's response."""
-    state.mark_received.clear()
-    await state.mark_received.wait()
+    try:
+        await asyncio.wait_for(state.mark_received.wait(), timeout=MARK_TIMEOUT_S)
+    except TimeoutError:
+        logger.warning("Mark echo timeout after turn %d", turn_index)
 
     state.response_buffer.clear()
     state.consecutive_silence = 0
     state.total_response_frames = 0
-    state.waiting_for_response = True
     state.response_done.clear()
 
     try:
@@ -203,8 +222,6 @@ async def _await_response(state: _StreamState, turn_index: int) -> None:
         )
     except TimeoutError:
         logger.debug("Response timeout after turn %d", turn_index)
-
-    state.waiting_for_response = False
 
     if state.call_result is not None:
         state.call_result.turn_responses.append(bytes(state.response_buffer))
