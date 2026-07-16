@@ -174,6 +174,8 @@ async def _sender(ws: WebSocket, state: _StreamState) -> None:
             await ws.send_text(msg)
             await asyncio.sleep(FRAME_DURATION_S)
 
+        state.mark_received.clear()
+
         mark_msg = json.dumps(
             {
                 "event": "mark",
@@ -186,10 +188,15 @@ async def _sender(ws: WebSocket, state: _StreamState) -> None:
         await _await_response(state, i)
 
 
+MARK_TIMEOUT_S = 5.0
+
+
 async def _await_response(state: _StreamState, turn_index: int) -> None:
     """Wait for the mark echo, then listen for the target's response."""
-    state.mark_received.clear()
-    await state.mark_received.wait()
+    try:
+        await asyncio.wait_for(state.mark_received.wait(), timeout=MARK_TIMEOUT_S)
+    except TimeoutError:
+        logger.warning("Mark echo timeout after turn %d", turn_index)
 
     state.response_buffer.clear()
     state.consecutive_silence = 0
