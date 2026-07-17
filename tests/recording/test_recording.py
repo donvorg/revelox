@@ -90,7 +90,6 @@ class TestTranscribeAudio:
         transcribe.assert_called_once_with(
             request=audio,
             encoding="mulaw",
-            sample_rate=MULAW_SAMPLE_RATE,
             model="nova-3",
             punctuate=True,
             smart_format=True,

@@ -59,7 +59,6 @@ def transcribe_audio(audio: bytes) -> str:
         response = client.listen.v1.media.transcribe_file(
             request=audio,
             encoding="mulaw",
-            sample_rate=MULAW_SAMPLE_RATE,
             model="nova-3",
             punctuate=True,
             smart_format=True,
