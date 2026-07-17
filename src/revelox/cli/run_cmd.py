@@ -1,16 +1,26 @@
 """The ``revelox run`` command."""
 
+from __future__ import annotations
+
 import logging
+import os
+import threading
+import time
 from pathlib import Path
 
 import click
+import uvicorn
 from pydantic import ValidationError
 
 from revelox.config import CONFIG_FILENAME, ConfigError, RunConfig, load_config
+from revelox.dialer import dial
+from revelox.server import create_app
+from revelox.tts import synthesize_script
 from revelox.utils.e164 import E164
 
 logger = logging.getLogger(__name__)
 
+CALL_TIMEOUT_S = 300
 DEFAULT_CONFIG_PATH = Path(CONFIG_FILENAME)
 
 
@@ -38,6 +48,19 @@ DEFAULT_CONFIG_PATH = Path(CONFIG_FILENAME)
     help="Phone number to call (E.164 format).",
 )
 @click.option(
+    "--script",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to the script file.",
+)
+@click.option(
+    "--port",
+    type=int,
+    default=8765,
+    show_default=True,
+    help="Local server port.",
+)
+@click.option(
     "--yes",
     is_flag=True,
     default=False,
@@ -47,6 +70,8 @@ def run_command(
     config_path: Path | None,
     from_number: str | None,
     target: str | None,
+    script: Path,
+    port: int,
     yes: bool,
 ) -> None:
     """Run attack suite against configured target."""
@@ -59,10 +84,37 @@ def run_command(
     ):
         raise click.Abort()
 
+    public_base_url = os.environ.get("PUBLIC_BASE_URL")
+    if not public_base_url:
+        raise click.UsageError("PUBLIC_BASE_URL environment variable is required.")
+
     click.echo(f"From:   {run_config.from_number}")
     click.echo(f"Target: {run_config.target}")
-    click.echo(f"LLM:    {run_config.llm.provider}/{run_config.llm.model}")
-    click.echo("Run not yet implemented.")
+
+    click.echo("Synthesizing script...")
+    audio_buffers = synthesize_script(script)
+    click.echo(f"Synthesized {len(audio_buffers)} turn(s).")
+
+    call_done = threading.Event()
+    app = create_app(audio_buffers, call_done=call_done)
+
+    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    server_thread = threading.Thread(target=server.run, daemon=True)
+    server_thread.start()
+
+    while not server.started:
+        time.sleep(0.05)
+
+    voice_url = f"{public_base_url}/voice"
+    click.echo(f"Dialing {run_config.target}...")
+    call_sid = dial(run_config.from_number, run_config.target, voice_url)
+    click.echo(f"Call placed: {call_sid}")
+
+    if not call_done.wait(timeout=CALL_TIMEOUT_S):
+        logger.warning("Call did not complete within %ds", CALL_TIMEOUT_S)
+    server.should_exit = True
+    server_thread.join()
 
 
 def _resolve_config(

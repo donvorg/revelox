@@ -1,8 +1,10 @@
 """Tests for script file parsing."""
 
+from pathlib import Path
+
 import pytest
 
-from revelox.script import parse_script, ScriptError
+from revelox.script import ScriptError, parse_script
 
 
 def test_parse_single_turn(tmp_path):
@@ -80,5 +82,23 @@ def test_mismatched_delimiters_extra_start(tmp_path):
 def test_mismatched_delimiters_extra_end(tmp_path):
     script = tmp_path / "mismatch.txt"
     script.write_text("<START_TURN>hello<END_TURN>\n<END_TURN>")
-    with pytest.raises(ScriptError, match="Mismatched delimiters"):
+    with pytest.raises(ScriptError, match="without matching"):
+        parse_script(script)
+
+
+def test_nested_start_turns_are_rejected(tmp_path: Path) -> None:
+    """Reject nested starts even when delimiter counts are balanced."""
+    script = tmp_path / "nested.txt"
+    script.write_text(
+        "<START_TURN>outer<START_TURN>inner<END_TURN><END_TURN>"
+    )
+    with pytest.raises(ScriptError, match="Nested"):
+        parse_script(script)
+
+
+def test_end_turn_before_start_is_rejected(tmp_path: Path) -> None:
+    """Reject an end marker that occurs before any start marker."""
+    script = tmp_path / "reversed.txt"
+    script.write_text("<END_TURN><START_TURN>content<END_TURN><START_TURN>")
+    with pytest.raises(ScriptError, match="without matching"):
         parse_script(script)
