@@ -5,8 +5,9 @@ import json
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from httpx_ws import WebSocketDisconnect
 
-from revelox.server import FRAME_SIZE, create_app
+from revelox.server import FRAME_SIZE, PLAYBACK_DONE_MARK, create_app
 
 
 @pytest.fixture
@@ -69,4 +70,18 @@ class TestMediaStreamWebSocket:
                     decoded = base64.b64decode(payload)
                     assert len(decoded) == FRAME_SIZE
 
-                await ws.send_text(json.dumps({"event": "stop"}))
+                raw = await ws.receive_text()
+                data = json.loads(raw)
+                assert data == {
+                    "event": "mark",
+                    "streamSid": "MZ_test",
+                    "mark": {"name": PLAYBACK_DONE_MARK},
+                }
+
+                await ws.send_text(
+                    json.dumps(
+                        {"event": "mark", "mark": {"name": PLAYBACK_DONE_MARK}}
+                    )
+                )
+                with pytest.raises(WebSocketDisconnect):
+                    await ws.receive_text()

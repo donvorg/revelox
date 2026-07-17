@@ -51,11 +51,11 @@ def pipeline_mocks(monkeypatch: pytest.MonkeyPatch):
     """Patch the full Twilio pipeline so run_command completes without blocking."""
     monkeypatch.setenv("PUBLIC_BASE_URL", "https://test.ngrok.io")
     with (
-        patch("revelox.tts.synthesize_script", return_value=[b"\xff" * 160]),
-        patch("revelox.server.create_app", side_effect=_mock_create_app),
-        patch("uvicorn.Config"),
-        patch("uvicorn.Server", new_callable=_make_server_class),
-        patch("revelox.dialer.dial", return_value="CA_test"),
+        patch("revelox.cli.run_cmd.synthesize_script", return_value=[b"\xff" * 160]),
+        patch("revelox.cli.run_cmd.create_app", side_effect=_mock_create_app),
+        patch("revelox.cli.run_cmd.uvicorn.Config"),
+        patch("revelox.cli.run_cmd.uvicorn.Server", new_callable=_make_server_class),
+        patch("revelox.cli.run_cmd.dial", return_value="CA_test"),
     ):
         yield
 
@@ -80,7 +80,7 @@ def test_run_with_env_vars(pipeline_mocks, script_file: str, monkeypatch: pytest
 
 def test_run_cli_args_override_config(pipeline_mocks, tmp_path: Path, script_file: str) -> None:
     config = tmp_path / "env_fallback.yaml"
-    config.write_text(f"""\
+    config.write_text("""\
 version: "1"
 run:
   target: "+19999999999"

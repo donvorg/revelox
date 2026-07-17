@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import json
 import logging
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 FRAME_SIZE = 160
 FRAME_DURATION_S = 0.02
+PLAYBACK_DONE_MARK = "playback-done"
 
 
 def create_app(audio_buffers: list[bytes], call_done: threading.Event | None = None) -> FastAPI:
@@ -65,6 +67,16 @@ def create_app(audio_buffers: list[bytes], call_done: threading.Event | None = N
                     await ws.send_text(msg)
                     await asyncio.sleep(FRAME_DURATION_S)
 
+            await ws.send_text(
+                json.dumps(
+                    {
+                        "event": "mark",
+                        "streamSid": stream_sid,
+                        "mark": {"name": PLAYBACK_DONE_MARK},
+                    }
+                )
+            )
+
         try:
             while True:
                 raw = await ws.receive_text()
@@ -76,6 +88,12 @@ def create_app(audio_buffers: list[bytes], call_done: threading.Event | None = N
                     logger.info("Stream started: %s", stream_sid)
                     stream_task = asyncio.create_task(_stream_audio(stream_sid))
 
+                elif event == "mark":
+                    mark_name = data.get("mark", {}).get("name", "")
+                    if mark_name == PLAYBACK_DONE_MARK:
+                        logger.info("Playback complete, closing stream")
+                        break
+
                 elif event == "stop":
                     logger.info("Stream stopped")
                     break
@@ -85,7 +103,11 @@ def create_app(audio_buffers: list[bytes], call_done: threading.Event | None = N
         finally:
             if stream_task and not stream_task.done():
                 stream_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await stream_task
             if app.state.call_done:
                 app.state.call_done.set()
+            with contextlib.suppress(RuntimeError):
+                await ws.close()
 
     return app
